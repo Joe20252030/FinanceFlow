@@ -1,18 +1,28 @@
 import os
+import sys
 import ttkbootstrap as tb
-from ttkbootstrap.constants import *
 from tkinter import ttk
 import tkinter.font as tkfont
 from PIL import Image, ImageTk
 import cairosvg
 
-# 推荐用 `python -m src.budget_app.ui.main_window` 运行
-try:
-    from src.budget_app.ui.inputs_view import InputsView
-    from src.budget_app.ui.plan_view import PlanView
-except ImportError:
-    from inputs_view import InputsView
-    from plan_view import PlanView
+# Robust import logic for both direct and module execution
+if __package__ is None or __package__ == "":
+    # Running as a script: insert src directory at sys.path[0] and use absolute imports
+    src_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../'))
+    if src_dir not in sys.path:
+        sys.path.insert(0, src_dir)
+    try:
+        from budget_app.ui.export_dialog import open_export_dialog
+        from budget_app.ui.inputs_view import InputsView
+        from budget_app.ui.plan_view import PlanView
+    except ModuleNotFoundError as e:
+        raise ImportError("Could not import budget_app modules. Please run with 'python -m budget_app.ui.main_window' from the src directory.") from e
+else:
+    # Running as a module: use relative imports
+    from .export_dialog import open_export_dialog
+    from .inputs_view import InputsView
+    from .plan_view import PlanView
 
 LANGUAGES = {
     'en': {
@@ -156,44 +166,53 @@ class MainWindow(tb.Window):
         self.title_label.pack(pady=(30, 10))
 
         # 主内容区域背景（圆角白色）
-        content_canvas = tb.Canvas(self, bg="#f7f8fa", highlightthickness=0)
+        content_canvas = tb.Canvas(self, bg="white", highlightthickness=0)
         content_canvas.pack(fill="both", expand=True, padx=40, pady=(0, 0))
-        # 绘制圆角白色矩形（可在窗口缩放时重绘，暂保留原逻辑）
+        # 内容Frame嵌入Canvas，强制背景白色
+        content_frame = ttk.Frame(content_canvas, style="TFrame")
+        content_frame.configure(style="TFrame")
+        content_window_id = content_canvas.create_window(0, 0, window=content_frame, anchor="nw")
+
         def redraw_canvas(event=None):
-            content_canvas.delete("all")
+            content_canvas.delete("bg")
             w = content_canvas.winfo_width()
             h = content_canvas.winfo_height()
             r = 32
-            x0, y0, x1, y1 = 0, 0, w, h
-            content_canvas.create_rectangle(x0+r, y0, x1-r, y1, fill="white", outline="white")
-            content_canvas.create_rectangle(x0, y0+r, x1, y1-r, fill="white", outline="white")
-            content_canvas.create_oval(x0, y0, x0+2*r, y0+2*r, fill="white", outline="white")
-            content_canvas.create_oval(x1-2*r, y0, x1, y0+2*r, fill="white", outline="white")
-            content_canvas.create_oval(x0, y1-2*r, x0+2*r, y1, fill="white", outline="white")
-            content_canvas.create_oval(x1-2*r, y1-2*r, x1, y1, fill="white", outline="white")
+            pad = 24
+            # 圆角区域缩小到内容Frame内部
+            x0, y0, x1, y1 = pad, pad, w-pad, h-pad
+            content_canvas.create_rectangle(x0+r, y0, x1-r, y1, fill="white", outline="white", tags="bg")
+            content_canvas.create_rectangle(x0, y0+r, x1, y1-r, fill="white", outline="white", tags="bg")
+            content_canvas.create_oval(x0, y0, x0+2*r, y0+2*r, fill="white", outline="white", tags="bg")
+            content_canvas.create_oval(x1-2*r, y0, x1, y0+2*r, fill="white", outline="white", tags="bg")
+            content_canvas.create_oval(x0, y1-2*r, x0+2*r, y1, fill="white", outline="white", tags="bg")
+            content_canvas.create_oval(x1-2*r, y1-2*r, x1, y1, fill="white", outline="white", tags="bg")
+            # 居中内容Frame
+            content_canvas.coords(content_window_id, pad, pad)
+            content_frame.config(width=w-2*pad, height=h-2*pad)
+            content_canvas.itemconfig(content_window_id, width=w-2*pad, height=h-2*pad)
         content_canvas.bind("<Configure>", redraw_canvas)
         redraw_canvas()
 
         # 主内容区域（自适应布局）
-        paned = ttk.PanedWindow(content_canvas, orient="horizontal")
-        paned.pack(fill="both", expand=True, padx=24, pady=24)
+        paned = ttk.PanedWindow(content_frame, orient="horizontal")
+        paned.pack(fill="both", expand=True)
 
         # 左侧输入区域
-        left_frame = ttk.Frame(paned)
+        left_frame = ttk.Frame(paned, style="TFrame")
         left_frame.configure(style="TFrame")
         paned.add(left_frame, weight=1)
-        self.inputs_title = tb.Label(left_frame, text="Input Form Area", font=self.questrial_bold, foreground="#333")
+        self.inputs_title = tb.Label(left_frame, text="Input Form Area", font=self.questrial_bold, foreground="#333", background="white")
         self.inputs_title.pack(padx=8, pady=(0, 8))
         self.inputs_view = InputsView(left_frame, self)
         self.inputs_view.pack(fill="both", expand=True, padx=8, pady=4)
 
         # 右侧计划展示区域
-        right_frame = ttk.Frame(paned)
+        right_frame = ttk.Frame(paned, style="TFrame")
         right_frame.configure(style="TFrame")
         paned.add(right_frame, weight=2)
-        self.plan_title = tb.Label(right_frame, text="Budget Allocation Display Area", font=self.questrial_bold, foreground="#333")
+        self.plan_title = tb.Label(right_frame, text="Budget Allocation Display Area", font=self.questrial_bold, foreground="#333", background="white")
         self.plan_title.pack(padx=8, pady=(0, 8))
-        # 替换原 plan_placeholder 为 PlanView
         self.plan_view = PlanView(right_frame, self)
         self.plan_view.pack(fill="both", expand=True, padx=8, pady=4)
 
@@ -201,8 +220,7 @@ class MainWindow(tb.Window):
         button_canvas = tb.Canvas(self, width=320, height=100, bg="#f7f8fa", highlightthickness=0)
         button_canvas.pack(pady=(10, 24))
         self._draw_image_buttons(button_canvas)
-        # 底部按钮提示标签
-        self.button_hint_label = tb.Label(self, text="", font=self.questrial_label)
+        self.button_hint_label = tb.Label(self, text="", font=self.questrial_label, background="#f7f8fa")
         self.button_hint_label.pack(side="bottom", pady=(0, 8))
 
     def _draw_image_buttons(self, canvas):
@@ -241,8 +259,20 @@ class MainWindow(tb.Window):
             canvas.tag_bind(btn_id, '<Leave>', on_leave)
 
     def open_export_dialog(self):
-        # TODO: 打开导出对话框，并在对话框中调用 self.export_plan(export_data)
-        print("[接口] 打开导出对话框")
+        # 获取当前计划数据
+        plan_data = []
+        if hasattr(self, 'plan_view') and hasattr(self.plan_view, 'table'):
+            for row in self.plan_view.table.get_children():
+                values = self.plan_view.table.item(row)['values']
+                # values: [category, amount, percent]
+                plan_data.append({
+                    'category': values[0],
+                    'amount': values[1],
+                    'percent': values[2]
+                })
+        # 调用导出对话框，修正参数类型为 dict
+        export_dict = {'plan_data': plan_data}
+        open_export_dialog(self, export_dict)
 
 if __name__ == "__main__":
     app = MainWindow()
