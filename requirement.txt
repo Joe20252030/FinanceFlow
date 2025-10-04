@@ -1,0 +1,17 @@
+# GUI framework
+PySide6>=6.6.0
+
+# Data modeling & validation
+pydantic>=2.6.0
+
+# Decimal & money utilities (you can drop this if you don't use it)
+# (Your utils/money.py likely uses only built-in decimal)
+
+# PDF export support (optional)
+reportlab>=3.6.0
+
+# Table/data export utilities
+pandas>=2.2.0
+
+# Testing (optional, only if you include tests in main deps)
+pytest>=8.0.0
