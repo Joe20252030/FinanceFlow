@@ -9,8 +9,10 @@ import cairosvg
 # 推荐用 `python -m src.budget_app.ui.main_window` 运行
 try:
     from src.budget_app.ui.inputs_view import InputsView
+    from src.budget_app.ui.plan_view import PlanView
 except ImportError:
     from inputs_view import InputsView
+    from plan_view import PlanView
 
 LANGUAGES = {
     'en': {
@@ -106,9 +108,9 @@ class MainWindow(tb.Window):
         # 右侧计划区标题
         if hasattr(self, 'plan_title'):
             self.plan_title.config(text="Budget Allocation Display Area" if lang == "en" else "预算分配展示区")
-        # 右侧计划区占位
-        if hasattr(self, 'plan_placeholder'):
-            self.plan_placeholder.config(text="📊 (plan_view)" if lang == "en" else "📊 (计划视图)")
+        # 右侧计划区 PlanView 语言切换
+        if hasattr(self, 'plan_view'):
+            self.plan_view.set_language(lang)
         # 清空按钮提示
         if hasattr(self, 'button_hint_label'):
             self.button_hint_label.config(text="")
@@ -161,8 +163,9 @@ class MainWindow(tb.Window):
         paned.add(right_frame, weight=2)
         self.plan_title = tb.Label(right_frame, text="Budget Allocation Display Area", font=self.questrial_bold, foreground="#333")
         self.plan_title.pack(padx=8, pady=(0, 8))
-        self.plan_placeholder = tb.Label(right_frame, text="📊 (plan_view)", font=self.questrial_label)
-        self.plan_placeholder.pack(padx=8, pady=4)
+        # 替换原 plan_placeholder 为 PlanView
+        self.plan_view = PlanView(right_frame, self)
+        self.plan_view.pack(fill="both", expand=True, padx=8, pady=4)
 
         # 底部按钮区域（用SVG图片按钮，无文字）
         button_canvas = tb.Canvas(self, width=320, height=100, bg="#f7f8fa", highlightthickness=0)

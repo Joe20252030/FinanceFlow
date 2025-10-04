@@ -69,15 +69,20 @@ class InputsView(tb.Frame):
             "<Configure>",
             lambda e: canvas.configure(scrollregion=canvas.bbox("all"))
         )
-        canvas.create_window((0,0), window=self.scroll_frame, anchor="nw")
+        canvas.create_window((0,0), window=self.scroll_frame, anchor="n")
+        def on_canvas_configure(event):
+            canvas_width = event.width
+            frame_width = self.scroll_frame.winfo_reqwidth()
+            x = max((canvas_width - frame_width) // 2, 0)
+            canvas.coords(1, x, 0)  # window_id=1 by default for first window
+        canvas.bind("<Configure>", on_canvas_configure)
 
         # 错误提示区
         self.error_label = tb.Label(self.scroll_frame, text="", bootstyle=DANGER)
-        self.error_label.pack(fill="x", pady=2)
-
+        self.error_label.pack(pady=2, anchor="center")
         # 收入输入区
         self.income_frame = tb.LabelFrame(self.scroll_frame, text=LANGUAGES[self.lang]['income_input'], bootstyle=INFO)
-        self.income_frame.pack(fill="x", pady=10)
+        self.income_frame.pack(pady=10, anchor="center")
         self.income_entries = []
         self.add_income_entry(self.income_frame)
         self.add_income_btn = tb.Button(self.income_frame, text=LANGUAGES[self.lang]['add_income'], command=lambda: self.add_income_entry(self.income_frame), bootstyle=SECONDARY)
@@ -85,14 +90,14 @@ class InputsView(tb.Frame):
 
         # 固定支出区
         self.fixed_frame = tb.LabelFrame(self.scroll_frame, text=LANGUAGES[self.lang]['fixed_costs'], bootstyle=WARNING)
-        self.fixed_frame.pack(fill="x", pady=10)
+        self.fixed_frame.pack(pady=10, anchor="center")
         self.fixed_entries = []
         for label in LANGUAGES[self.lang]['fixed_labels']:
             self.add_fixed_entry(self.fixed_frame, label)
 
         # 预算偏好区
         self.prefs_frame = tb.LabelFrame(self.scroll_frame, text=LANGUAGES[self.lang]['budget_prefs'], bootstyle=SUCCESS)
-        self.prefs_frame.pack(fill="x", pady=10)
+        self.prefs_frame.pack(pady=10, anchor="center")
         self.pref_entries = []
         for label in LANGUAGES[self.lang]['categories']:
             self.add_pref_entry(self.prefs_frame, label)
@@ -101,7 +106,7 @@ class InputsView(tb.Frame):
 
         # 约束区
         self.constraint_frame = tb.LabelFrame(self.scroll_frame, text=LANGUAGES[self.lang]['constraint_settings'], bootstyle=DANGER)
-        self.constraint_frame.pack(fill="x", pady=10)
+        self.constraint_frame.pack(pady=10, anchor="center")
         self.constraint_entries = []
         for label in LANGUAGES[self.lang]['constraint_labels']:
             self.add_constraint_entry(self.constraint_frame, label)
@@ -110,7 +115,7 @@ class InputsView(tb.Frame):
 
         # 提交与重置
         btn_frame = tb.Frame(self.scroll_frame)
-        btn_frame.pack(fill="x", pady=15)
+        btn_frame.pack(pady=15, anchor="center")
         self.submit_btn = tb.Button(btn_frame, text=LANGUAGES[self.lang]['submit'], bootstyle=PRIMARY, command=self.submit)
         self.submit_btn.pack(side="left", padx=10)
         self.reset_btn = tb.Button(btn_frame, text=LANGUAGES[self.lang]['reset'], bootstyle=SECONDARY, command=self.reset)
