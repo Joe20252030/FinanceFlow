@@ -57,25 +57,20 @@ class InputsView(tb.Frame):
         style.configure("Custom.TFrame", background="#F0F0F0")
 
         # 滚动区（双向滚动条）
-        canvas = tb.Canvas(self, bg="#F0F0F0", highlightthickness=0)
-        vscroll = tb.Scrollbar(self, orient="vertical", command=canvas.yview)
-        hscroll = tb.Scrollbar(self, orient="horizontal", command=canvas.xview)
-        canvas.configure(yscrollcommand=vscroll.set, xscrollcommand=hscroll.set)
-        canvas.grid(row=0, column=0, sticky="nsew")
-        vscroll.grid(row=0, column=1, sticky="ns")
-        hscroll.grid(row=1, column=0, sticky="ew")
-        self.scroll_frame = tb.Frame(canvas, style="Custom.TFrame")
-        self.scroll_frame.bind(
-            "<Configure>",
-            lambda e: canvas.configure(scrollregion=canvas.bbox("all"))
-        )
-        canvas.create_window((0,0), window=self.scroll_frame, anchor="n")
-        def on_canvas_configure(event):
-            canvas_width = event.width
-            frame_width = self.scroll_frame.winfo_reqwidth()
-            x = max((canvas_width - frame_width) // 2, 0)
-            canvas.coords(1, x, 0)  # window_id=1 by default for first window
-        canvas.bind("<Configure>", on_canvas_configure)
+        self.canvas = tb.Canvas(self, bg="#F0F0F0", highlightthickness=0)
+        self.scroll_frame = tb.Frame(self.canvas, style="Custom.TFrame")
+        self.v_scroll = ttk.Scrollbar(self, orient="vertical", command=self.canvas.yview)
+        self.h_scroll = ttk.Scrollbar(self, orient="horizontal", command=self.canvas.xview)
+        self.canvas.configure(yscrollcommand=self.v_scroll.set, xscrollcommand=self.h_scroll.set)
+        self.v_scroll.pack(side="right", fill="y")
+        self.h_scroll.pack(side="bottom", fill="x")
+        self.canvas.pack(side="left", fill="both", expand=True)
+        self.window_id = self.canvas.create_window((0,0), window=self.scroll_frame, anchor="nw")
+        self.scroll_frame.bind("<Configure>", self._on_frame_configure)
+        self.canvas.bind("<Configure>", self._on_canvas_configure)
+        # 只在鼠标悬停时绑定滚轮事件
+        self.canvas.bind("<Enter>", self._bind_mousewheel)
+        self.canvas.bind("<Leave>", self._unbind_mousewheel)
 
         # 错误提示区
         self.error_label = tb.Label(self.scroll_frame, text="", bootstyle=DANGER)
@@ -121,16 +116,36 @@ class InputsView(tb.Frame):
         self.reset_btn = tb.Button(btn_frame, text=LANGUAGES[self.lang]['reset'], bootstyle=SECONDARY, command=self.reset)
         self.reset_btn.pack(side="right", padx=10)
 
-        # 鼠标滚轮事件绑定（上下滚动，Shift+滚轮左右滚动）
-        def _on_mousewheel(event):
-            delta = event.delta
-            if abs(delta) < 10:
-                delta = delta * 120
-            if event.state & 0x0001:
-                canvas.xview_scroll(int(-1 * (delta / 120)), "units")
-            else:
-                canvas.yview_scroll(int(-1 * (delta / 120)), "units")
-        canvas.bind_all("<MouseWheel>", _on_mousewheel)
+    def _bind_mousewheel(self, event):
+        self.canvas.bind_all("<MouseWheel>", self._on_mousewheel)
+        self.canvas.bind_all("<Shift-MouseWheel>", self._on_shift_mousewheel)
+    def _unbind_mousewheel(self, event):
+        self.canvas.unbind_all("<MouseWheel>")
+        self.canvas.unbind_all("<Shift-MouseWheel>")
+
+    def _on_frame_configure(self, event):
+        self.canvas.configure(scrollregion=self.canvas.bbox("all"))
+
+    def _on_canvas_configure(self, event):
+        # 居中 scroll_frame
+        canvas_width = event.width
+        frame_width = self.scroll_frame.winfo_reqwidth()
+        x = max((canvas_width - frame_width) // 2, 0)
+        self.canvas.coords(self.window_id, x, 0)
+
+    def _on_mousewheel(self, event):
+        delta = event.delta
+        if abs(delta) < 10:
+            delta *= 120  # macOS 兼容
+        self.canvas.yview_scroll(int(-1*(delta/120)), "units")
+        return "break"
+
+    def _on_shift_mousewheel(self, event):
+        delta = event.delta
+        if abs(delta) < 10:
+            delta *= 120
+        self.canvas.xview_scroll(int(-1*(delta/120)), "units")
+        return "break"
 
     def set_language(self, lang):
         self.lang = lang

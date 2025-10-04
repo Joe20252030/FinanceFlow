@@ -22,9 +22,17 @@ class PlanView(ttk.Frame):
         self.window_id = self.canvas.create_window((0,0), window=self.scroll_frame, anchor="n")
         self.scroll_frame.bind("<Configure>", self._on_frame_configure)
         self.canvas.bind("<Configure>", self._on_canvas_configure)
+        # 只在鼠标悬停时绑定滚轮事件
+        self.canvas.bind("<Enter>", self._bind_mousewheel)
+        self.canvas.bind("<Leave>", self._unbind_mousewheel)
+        self._init_ui(self.scroll_frame)
+
+    def _bind_mousewheel(self, event):
         self.canvas.bind_all("<MouseWheel>", self._on_mousewheel)
         self.canvas.bind_all("<Shift-MouseWheel>", self._on_shift_mousewheel)
-        self._init_ui(self.scroll_frame)
+    def _unbind_mousewheel(self, event):
+        self.canvas.unbind_all("<MouseWheel>")
+        self.canvas.unbind_all("<Shift-MouseWheel>")
 
     def _on_frame_configure(self, event):
         self.canvas.configure(scrollregion=self.canvas.bbox("all"))
@@ -37,10 +45,16 @@ class PlanView(ttk.Frame):
         self.canvas.coords(self.window_id, x, 0)
 
     def _on_mousewheel(self, event):
-        self.canvas.yview_scroll(int(-1*(event.delta/120)), "units")
+        delta = event.delta
+        if abs(delta) < 10:
+            delta *= 120  # macOS 兼容
+        self.canvas.yview_scroll(int(-1*(delta/120)), "units")
 
     def _on_shift_mousewheel(self, event):
-        self.canvas.xview_scroll(int(-1*(event.delta/120)), "units")
+        delta = event.delta
+        if abs(delta) < 10:
+            delta *= 120
+        self.canvas.xview_scroll(int(-1*(delta/120)), "units")
 
     def _init_ui(self, parent):
         self.title_label = tb.Label(parent, text=self._get_text('plan_title'), font=self.main_window.questrial_bold, foreground="#333")
@@ -66,11 +80,17 @@ class PlanView(ttk.Frame):
         self.chart_placeholder.pack(padx=8, pady=(4, 8), anchor="center")
 
     def _on_table_mousewheel(self, event):
-        self.table.yview_scroll(int(-1*(event.delta/120)), "units")
+        delta = event.delta
+        if abs(delta) < 10:
+            delta *= 120
+        self.canvas.yview_scroll(int(-1*(delta/120)), "units")
         return "break"
 
     def _on_table_shift_mousewheel(self, event):
-        self.table.xview_scroll(int(-1*(event.delta/120)), "units")
+        delta = event.delta
+        if abs(delta) < 10:
+            delta *= 120
+        self.canvas.xview_scroll(int(-1*(delta/120)), "units")
         return "break"
 
     def set_language(self, lang):
