@@ -55,6 +55,36 @@ LANGUAGES = {
 CURRENT_LANG = 'en'
 
 class MainWindow(tb.Window):
+    # === UI与后端数据交互接口（统一入口） ===
+    def generate_plan(self, data=None):
+        """
+        接收 InputsView 的预算输入数据，调用后端 planner 生成预算方案，并更新 PlanView。
+        :param data: dict, 预算输入数据（由 InputsView.submit 传入）
+        """
+        # TODO: 调用 planner 计算预算方案
+        # 例如: plan_data, notes = self.planner.generate(data)
+        # self.plan_view.update_plan(plan_data, notes)
+        print("[接口] 生成预算方案: ", data)
+
+    def export_plan(self, export_data=None):
+        """
+        接收导出请求，调用后端导出逻辑（如 export.py），完成文件保存。
+        :param export_data: dict, 导出相关数据（由 ExportDialog 传入）
+        """
+        # TODO: 调用后端导出逻辑
+        print("[接口] 导出预算方案: ", export_data)
+
+    def reset_all(self):
+        """
+        重置所有输入和结果，通知 InputsView 和 PlanView 清空内容。
+        """
+        # TODO: 调用 InputsView/PlanView 的重置方法
+        print("[接口] 重置所有输入和结果")
+        if hasattr(self, 'inputs_view'):
+            self.inputs_view.reset()
+        if hasattr(self, 'plan_view'):
+            self.plan_view.update_plan([], notes="")
+
     def create_language_menu(self):
         import tkinter as tk
         menubar = tk.Menu(self)
@@ -210,14 +240,9 @@ class MainWindow(tb.Window):
             canvas.tag_bind(btn_id, '<Enter>', on_enter)
             canvas.tag_bind(btn_id, '<Leave>', on_leave)
 
-    def generate_plan(self):
-        print("Generating budget plan...")
-
     def open_export_dialog(self):
-        print("Opening export dialog...")
-
-    def reset_all(self):
-        print("Resetting all inputs and results...")
+        # TODO: 打开导出对话框，并在对话框中调用 self.export_plan(export_data)
+        print("[接口] 打开导出对话框")
 
 if __name__ == "__main__":
     app = MainWindow()
