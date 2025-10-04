@@ -5,6 +5,11 @@ from tkinter import ttk
 import tkinter.font as tkfont
 from PIL import Image, ImageDraw, ImageTk, ImageFont
 import cairosvg
+# 推荐用 `python -m src.budget_app.ui.main_window` 运行
+try:
+    from src.budget_app.ui.inputs_view import InputsView
+except ImportError:
+    from inputs_view import InputsView
 
 class MainWindow(tb.Window):
     def __init__(self):
@@ -30,32 +35,38 @@ class MainWindow(tb.Window):
         title_label.pack(pady=(30, 10))
 
         # 主内容区域背景（圆角白色）
-        content_canvas = tb.Canvas(self, width=820, height=420, bg="#f7f8fa", highlightthickness=0)
-        content_canvas.pack(padx=40, pady=(0, 0))
-        # 绘制圆角白色矩形
-        x0, y0, x1, y1, r = 0, 0, 820, 420, 32
-        content_canvas.create_rectangle(x0+r, y0, x1-r, y1, fill="white", outline="white")
-        content_canvas.create_rectangle(x0, y0+r, x1, y1-r, fill="white", outline="white")
-        # 四个圆角
-        content_canvas.create_oval(x0, y0, x0+2*r, y0+2*r, fill="white", outline="white")
-        content_canvas.create_oval(x1-2*r, y0, x1, y0+2*r, fill="white", outline="white")
-        content_canvas.create_oval(x0, y1-2*r, x0+2*r, y1, fill="white", outline="white")
-        content_canvas.create_oval(x1-2*r, y1-2*r, x1, y1, fill="white", outline="white")
+        content_canvas = tb.Canvas(self, bg="#f7f8fa", highlightthickness=0)
+        content_canvas.pack(fill="both", expand=True, padx=40, pady=(0, 0))
+        # 绘制圆角白色矩形（可在窗口缩放时重绘，暂保留原逻辑）
+        def redraw_canvas(event=None):
+            content_canvas.delete("all")
+            w = content_canvas.winfo_width()
+            h = content_canvas.winfo_height()
+            r = 32
+            x0, y0, x1, y1 = 0, 0, w, h
+            content_canvas.create_rectangle(x0+r, y0, x1-r, y1, fill="white", outline="white")
+            content_canvas.create_rectangle(x0, y0+r, x1, y1-r, fill="white", outline="white")
+            content_canvas.create_oval(x0, y0, x0+2*r, y0+2*r, fill="white", outline="white")
+            content_canvas.create_oval(x1-2*r, y0, x1, y0+2*r, fill="white", outline="white")
+            content_canvas.create_oval(x0, y1-2*r, x0+2*r, y1, fill="white", outline="white")
+            content_canvas.create_oval(x1-2*r, y1-2*r, x1, y1, fill="white", outline="white")
+        content_canvas.bind("<Configure>", redraw_canvas)
+        redraw_canvas()
 
-        # 主内容区域（嵌入 Canvas 内部）
+        # 主内容区域（自适应布局）
         paned = ttk.PanedWindow(content_canvas, orient="horizontal")
-        paned.place(x=24, y=24, width=772, height=372)
+        paned.pack(fill="both", expand=True, padx=24, pady=24)
 
-        # 左侧输入区域（分区标题沉稳色，加粗）
+        # 左侧输入区域
         left_frame = ttk.Frame(paned)
         left_frame.configure(style="TFrame")
         paned.add(left_frame, weight=1)
         inputs_title = tb.Label(left_frame, text="Input Form Area", font=self.questrial_bold, foreground="#333")
         inputs_title.pack(padx=8, pady=(0, 8))
-        inputs_placeholder = tb.Label(left_frame, text="📥 (inputs_view)", font=self.questrial_label, bootstyle=INFO)
-        inputs_placeholder.pack(padx=8, pady=4)
+        self.inputs_view = InputsView(left_frame, self)
+        self.inputs_view.pack(fill="both", expand=True, padx=8, pady=4)
 
-        # 右侧计划展示区域（分区标题沉稳色，加粗）
+        # 右侧计划展示区域
         right_frame = ttk.Frame(paned)
         right_frame.configure(style="TFrame")
         paned.add(right_frame, weight=2)
