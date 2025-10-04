@@ -231,6 +231,19 @@ class InputsView(tb.Frame):
         max_spin.pack(side="left", padx=5)
         del_btn = tb.Button(frame, text=LANGUAGES[self.lang]['delete'], bootstyle=DANGER, command=lambda: self._del_constraint_entry(frame))
         del_btn.pack(side="left", padx=5)
+        # 悬停提示
+        def show_min_hint(event):
+            hint = "Minimum budget" if self.lang == "en" else "最小预算"
+            self.controller.button_hint_label.config(text=hint)
+        def show_max_hint(event):
+            hint = "Maximum budget" if self.lang == "en" else "最大预算"
+            self.controller.button_hint_label.config(text=hint)
+        def clear_hint(event):
+            self.controller.button_hint_label.config(text="")
+        min_spin.bind("<Enter>", show_min_hint)
+        min_spin.bind("<Leave>", clear_hint)
+        max_spin.bind("<Enter>", show_max_hint)
+        max_spin.bind("<Leave>", clear_hint)
         self.constraint_entries.append((frame, label, min_spin, max_spin))
 
     def _del_constraint_entry(self, frame):
