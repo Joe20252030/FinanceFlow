@@ -1,12 +1,15 @@
 import ttkbootstrap as tb
 from tkinter import ttk
 import tkinter as tk
+from matplotlib.figure import Figure
+from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 
 class PlanView(ttk.Frame):
     def __init__(self, parent, main_window):
         super().__init__(parent)
         self.main_window = main_window
         self.language = getattr(main_window, 'language', 'en')
+        self.chart_canvas = None
         self._init_scrollable_ui()
 
     def _init_scrollable_ui(self):
@@ -75,9 +78,9 @@ class PlanView(ttk.Frame):
         # 提示区
         self.notes_label = tb.Label(parent, text="", font=self.main_window.questrial_label, foreground="#C33")
         self.notes_label.pack(padx=8, pady=(4, 8), anchor="center")
-        # 图表区（预留）
-        self.chart_placeholder = tb.Label(parent, text="(Chart Area)", font=self.main_window.questrial_label, foreground="#888")
-        self.chart_placeholder.pack(padx=8, pady=(4, 8), anchor="center")
+        # 图表区（matplotlib嵌入）
+        self.chart_frame = ttk.Frame(parent)
+        self.chart_frame.pack(padx=8, pady=(4, 8), anchor="center", fill="both", expand=True)
 
     def _on_table_mousewheel(self, event):
         delta = event.delta
@@ -102,11 +105,54 @@ class PlanView(ttk.Frame):
         self.chart_placeholder.config(text="(Chart Area)" if lang == "en" else "（图表区）")
 
     def update_plan(self, plan_data, notes=None):
+        """
+        重新实现表格逻辑：
+        - 自动清空表格
+        - 统计总金额
+        - 按 category/amount 展示所有项
+        - 自动计算百分比
+        - 支持金额为0或缺失时的健壮处理
+        """
         for row in self.table.get_children():
             self.table.delete(row)
+        # 统计总金额（只统计正数）
+        total_amount = sum(float(item.get("amount", 0)) for item in plan_data if float(item.get("amount", 0)) > 0)
+        # 按顺序插入所有项
         for item in plan_data:
-            self.table.insert("", "end", values=(item["category"], item["amount"], item["percent"]))
+            category = item.get("category", "")
+            try:
+                amt = float(item.get("amount", 0))
+            except Exception:
+                amt = 0
+            percent = round(amt / total_amount * 100, 2) if total_amount > 0 else 0
+            self.table.insert("", "end", values=(category, amt, percent))
         self.notes_label.config(text=notes or "")
+        # --- 英文柱状图总结 ---
+        self._draw_bar_chart(plan_data)
+
+    def _draw_bar_chart(self, plan_data):
+        # 清除旧图表
+        if self.chart_canvas:
+            self.chart_canvas.get_tk_widget().destroy()
+            self.chart_canvas = None
+        # 收集数据
+        categories = [item.get("category", "") for item in plan_data if float(item.get("amount", 0)) > 0]
+        amounts = [float(item.get("amount", 0)) for item in plan_data if float(item.get("amount", 0)) > 0]
+        if not categories or not amounts:
+            lbl = tb.Label(self.chart_frame, text="(No data for chart)", font=self.main_window.questrial_label, foreground="#888")
+            lbl.pack()
+            return
+        fig = Figure(figsize=(5, 2.5), dpi=100)
+        ax = fig.add_subplot(111)
+        ax.bar(categories, amounts, color="#4A90E2")
+        ax.set_title("Budget Allocation Summary", fontsize=12)
+        ax.set_xlabel("Category", fontsize=10)
+        ax.set_ylabel("Amount", fontsize=10)
+        ax.tick_params(axis='x', labelrotation=30)
+        fig.tight_layout()
+        self.chart_canvas = FigureCanvasTkAgg(fig, master=self.chart_frame)
+        self.chart_canvas.draw()
+        self.chart_canvas.get_tk_widget().pack(fill="both", expand=True)
 
     def _get_text(self, key):
         texts = {

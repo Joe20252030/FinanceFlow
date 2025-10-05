@@ -68,13 +68,28 @@ class MainWindow(tb.Window):
     # === UI与后端数据交互接口（统一入口） ===
     def generate_plan(self, data=None):
         """
-        接收 InputsView 的预算输入数据，调用后端 planner 生成预算方案，并更新 PlanView。
-        :param data: dict, 预算输入数据（由 InputsView.submit 传入）
+        接收 InputsView 的预算输入数据，调用本地预算分配算法，并更新 PlanView。
         """
-        # TODO: 调用 planner 计算预算方案
-        # 例如: plan_data, notes = self.planner.generate(data)
-        # self.plan_view.update_plan(plan_data, notes)
-        print("[接口] 生成预算方案: ", data)
+        from budget_app.core.api import generate_budget_plan_local, parse_gemini_response
+        import json
+        if hasattr(self, 'inputs_view'):
+            input_data = self.inputs_view.get_all_input_data()
+            # 移除 constraints 相关逻辑
+            # 修正：将 input_data['fixed_costs'] 转为 category-amount 格式，直接传给 plan_view
+            fixed_costs = input_data.get("fixed_costs", [])
+            fixed_items = [
+                {"category": item["name"], "amount": float(item["amount"]) if item["amount"] else 0}
+                for item in fixed_costs if item["amount"] and float(item["amount"]) > 0
+            ]
+            # 本地预算分配（api.py不再计算percent）
+            result_text = generate_budget_plan_local(input_data)
+            print("[TEST] 本地预算分配结果:\n", result_text)
+            plan_data = parse_gemini_response(result_text)
+            # 合并固定支出项和预算分配项
+            all_items = fixed_items + plan_data
+            if hasattr(self, 'plan_view'):
+                self.plan_view.update_plan(all_items)
+            print("[接口] 生成预算方案: ", data)
 
     def export_plan(self, export_data=None):
         """
@@ -97,6 +112,7 @@ class MainWindow(tb.Window):
 
     def create_language_menu(self):
         import tkinter as tk
+        from tkinter import simpledialog, messagebox
         menubar = tk.Menu(self)
         # Language menu
         lang_menu = tk.Menu(menubar, tearoff=0)
@@ -116,25 +132,24 @@ class MainWindow(tb.Window):
         self.config(menu=menubar)
         self._menubar = menubar  # Save reference for language switching
 
-    def __init__(self):
-        super().__init__(themename="minty")  # 更现代圆角主题
-        self.language = CURRENT_LANG
-        self.title("FinanceFlow Budget Planner")
-        self.geometry("900x600")
-        self.resizable(True, True)
-        self.configure(bg="#f7f8fa")  # 苹果风浅灰背景
-        self.create_language_menu()  # 确保菜单栏在窗口初始化时创建
+    def open_gemini_key_dialog(self):
+        from tkinter import simpledialog, messagebox
+        key = simpledialog.askstring("Gemini API Key", "Enter your Gemini API Key:", parent=self)
+        if key is not None:
+            try:
+                with open(os.path.expanduser("~/.financeflow_gemini_key"), "w") as f:
+                    f.write(key.strip())
+                self.gemini_api_key = key.strip()
+                messagebox.showinfo("Success", "Gemini API Key saved.")
+            except Exception as e:
+                messagebox.showerror("Error", f"Failed to save key: {e}")
 
-        # 字体路径
-        font_dir = os.path.join(os.path.dirname(__file__), '../../assets/fonts')
-        self.questrial_regular = tkfont.Font(family="Questrial", size=22, weight="normal")
-        self.questrial_label = tkfont.Font(family="Questrial", size=13, weight="normal")
-        self.questrial_button = tkfont.Font(family="Questrial", size=13, weight="normal")
-        # 主标题（沉稳深蓝色，加粗）
-        self.questrial_bold = tkfont.Font(family="Questrial", size=24, weight="bold")
-
-        self.create_widgets()
-
+    def load_gemini_api_key(self):
+        try:
+            with open(os.path.expanduser("~/.financeflow_gemini_key"), "r") as f:
+                self.gemini_api_key = f.read().strip()
+        except Exception:
+            self.gemini_api_key = None
 
     def set_language(self, lang):
         global CURRENT_LANG
@@ -159,6 +174,28 @@ class MainWindow(tb.Window):
         # 刷新菜单栏
         self.create_language_menu()
         # ...可扩展其他UI刷新...
+
+    def __init__(self):
+        super().__init__(themename="minty")  # 更现代圆角主题
+        self.language = CURRENT_LANG
+        self.title("FinanceFlow Budget Planner")
+        self.geometry("900x600")
+        self.resizable(True, True)
+        self.configure(bg="#f7f8fa")  # 苹果风浅灰背景
+        self.gemini_api_key = None
+        self.load_gemini_api_key()
+        self.create_language_menu()  # 确保菜单栏在窗口初始化时创建
+
+        # 字体路径
+        font_dir = os.path.join(os.path.dirname(__file__), '../../assets/fonts')
+        self.questrial_regular = tkfont.Font(family="Questrial", size=22, weight="normal")
+        self.questrial_label = tkfont.Font(family="Questrial", size=13, weight="normal")
+        self.questrial_button = tkfont.Font(family="Questrial", size=13, weight="normal")
+        # 主标题（沉稳深蓝色，加粗）
+        self.questrial_bold = tkfont.Font(family="Questrial", size=24, weight="bold")
+
+        self.create_widgets()
+
 
     def create_widgets(self):
         # 顶部主标题栏

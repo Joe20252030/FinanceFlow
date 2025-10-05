@@ -161,6 +161,44 @@ class ExportDialog(tk.Toplevel):
 
 
 # Optional helper if you prefer a function call from MainWindow:
-def open_export_dialog(parent, plan: dict):
-    dlg = ExportDialog(parent, plan)
-    return getattr(dlg, "result", None)
+def open_export_dialog(parent, export_dict):
+    """
+    弹出文件保存对话框，将plan_data导出为CSV，并在末尾总结总支出。
+    :param parent: 主窗口
+    :param export_dict: {'plan_data': [...]}，每项包含category, amount, percent
+    """
+    plan_data = export_dict.get('plan_data', [])
+    if not plan_data:
+        messagebox.showerror("导出失败", "没有可导出的预算数据。", parent=parent)
+        return
+    # 选择保存路径
+    file_path = filedialog.asksaveasfilename(
+        parent=parent,
+        title="导出预算为CSV",
+        defaultextension=".csv",
+        filetypes=[("CSV文件", "*.csv"), ("所有文件", "*.*")]
+    )
+    if not file_path:
+        return  # 用户取消
+    try:
+        total_amount = 0.0
+        with open(file_path, "w", newline="", encoding="utf-8") as f:
+            writer = csv.writer(f)
+            writer.writerow(["Category", "Amount", "Percent"])
+            for item in plan_data:
+                amount = item.get("amount", 0)
+                try:
+                    amount_float = float(amount)
+                except Exception:
+                    amount_float = 0.0
+                total_amount += amount_float
+                writer.writerow([
+                    item.get("category", ""),
+                    f"{amount_float:.2f}",
+                    item.get("percent", "")
+                ])
+            # 总支出统计行
+            writer.writerow(["Total", f"{total_amount:.2f}", ""])
+        messagebox.showinfo("导出成功", f"预算已成功导出到：\n{file_path}", parent=parent)
+    except Exception as e:
+        messagebox.showerror("导出失败", f"导出CSV时出错：{e}", parent=parent)
