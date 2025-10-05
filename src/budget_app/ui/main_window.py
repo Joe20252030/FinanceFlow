@@ -3,8 +3,22 @@ import sys
 import ttkbootstrap as tb
 from tkinter import ttk
 import tkinter.font as tkfont
-from PIL import Image, ImageTk
-import cairosvg
+# PIL (Pillow) is used for image handling; import defensively
+try:
+    from PIL import Image, ImageTk
+    _PIL_AVAILABLE = True
+except Exception:
+    Image = None
+    ImageTk = None
+    _PIL_AVAILABLE = False
+
+# cairosvg requires the native cairo library; import lazily/defensively
+try:
+    import cairosvg
+    _CAIROSVG_AVAILABLE = True
+except Exception:
+    cairosvg = None
+    _CAIROSVG_AVAILABLE = False
 
 # Robust import logic for both direct and module execution
 if __package__ is None or __package__ == "":
@@ -71,18 +85,51 @@ class MainWindow(tb.Window):
         接收 InputsView 的预算输入数据，调用后端 planner 生成预算方案，并更新 PlanView。
         :param data: dict, 预算输入数据（由 InputsView.submit 传入）
         """
-        # TODO: 调用 planner 计算预算方案
-        # 例如: plan_data, notes = self.planner.generate(data)
-        # self.plan_view.update_plan(plan_data, notes)
-        print("[接口] 生成预算方案: ", data)
+        # If we were passed a PlanningInput (from InputsView.submit), run Planner
+        try:
+            from src.budget_app.core.planner import Planner
+            from src.budget_app.core.models import PlanItem
+        except Exception:
+            from ..core.planner import Planner
+            from ..core.models import PlanItem
+
+        if data is None:
+            print("[接口] generate_plan called with no data")
+            return
+
+        planner = Planner()
+        try:
+            result = planner.build_plan(data)
+        except Exception as e:
+            print("Planner error:", e)
+            self.plan_view.update_plan([], notes=str(e))
+            return
+
+        # Convert PlanResult into simple list-of-dicts for PlanView
+        plan_rows = []
+        for item in result.items:
+            # item: PlanItem(category, kind, allocated)
+            plan_rows.append({
+                'category': item.category,
+                'amount': str(item.allocated),
+                'percent': ''
+            })
+
+        # Update PlanView
+        if hasattr(self, 'plan_view'):
+            self.plan_view.update_plan(plan_rows, notes="")
+        print("[接口] 生成预算方案: done")
 
     def export_plan(self, export_data=None):
         """
         接收导出请求，调用后端导出逻辑（如 export.py），完成文件保存。
         :param export_data: dict, 导出相关数据（由 ExportDialog 传入）
         """
-        # TODO: 调用后端导出逻辑
-        print("[接口] 导出预算方案: ", export_data)
+        # export_data is expected to be a dict containing plan_data; forward to export dialog
+        try:
+            open_export_dialog(self, export_data or {})
+        except Exception as e:
+            print("Export failed:", e)
 
     def reset_all(self):
         """
@@ -238,11 +285,32 @@ class MainWindow(tb.Window):
             if not os.path.exists(img_path):
                 raise FileNotFoundError(f"Button image not found: {img_path}")
             from io import BytesIO
-            try:
-                png_bytes = cairosvg.svg2png(url=img_path, output_width=btn_width, output_height=btn_height)
-                img = Image.open(BytesIO(png_bytes)).convert("RGBA")
-            except ImportError:
-                raise ImportError("cairosvg is required for SVG support. Please install with 'pip install cairosvg'.")
+            # Prefer to render SVG with cairosvg -> PNG. If cairosvg or Pillow
+            # is unavailable, fall back to a same-named PNG file if present.
+            img = None
+            if _CAIROSVG_AVAILABLE and _PIL_AVAILABLE:
+                try:
+                    png_bytes = cairosvg.svg2png(url=img_path, output_width=btn_width, output_height=btn_height)
+                    img = Image.open(BytesIO(png_bytes)).convert("RGBA")
+                except Exception:
+                    img = None
+
+            if img is None and _PIL_AVAILABLE:
+                # Try a PNG sibling file
+                png_path = os.path.splitext(img_path)[0] + '.png'
+                if os.path.exists(png_path):
+                    try:
+                        img = Image.open(png_path).convert("RGBA")
+                    except Exception:
+                        img = None
+
+            if img is None:
+                # Create a small blank placeholder image so the UI still shows
+                if _PIL_AVAILABLE:
+                    img = Image.new('RGBA', (btn_width, btn_height), (200, 200, 200, 255))
+                else:
+                    raise ImportError("Pillow is required to display button images. Please install with 'pip install pillow'.")
+
             tk_img = ImageTk.PhotoImage(img)
             self.tk_btn_imgs.append(tk_img)
             btn_id = canvas.create_image(btn["x"], y, anchor="nw", image=tk_img)

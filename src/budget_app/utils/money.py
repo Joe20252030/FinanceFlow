@@ -31,9 +31,37 @@ class Money(Decimal):
     def __sub__(self, other):
         return Money(super().__sub__(Money(other)))
 
+    def __radd__(self, other):
+        # support sum() where start is 0 (an int)
+        return self.__add__(other)
+
+    def __mul__(self, other):
+        return Money(super().__mul__(Money(other)))
+
+    def __rmul__(self, other):
+        return Money(super().__rmul__(Money(other)))
+
+    def __truediv__(self, other):
+        return Money(super().__truediv__(Money(other)))
+
+    def __rtruediv__(self, other):
+        return Money(super().__rtruediv__(Money(other)))
+
     # Optional helpers
     def is_positive(self) -> bool:
         return self > 0
 
     def is_zero(self) -> bool:
         return self == 0
+
+    # Convenience constructors
+    @classmethod
+    def from_decimal(cls, d) -> "Money":
+        if isinstance(d, Money):
+            return d
+        # Accept Decimal or numeric types
+        return cls(str(d))
+
+    @classmethod
+    def from_float(cls, f: float) -> "Money":
+        return cls(str(f))

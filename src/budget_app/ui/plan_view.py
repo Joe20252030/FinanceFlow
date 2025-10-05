@@ -10,7 +10,7 @@ class PlanView(ttk.Frame):
         self._init_scrollable_ui()
 
     def _init_scrollable_ui(self):
-        # 主滚动容器 Canvas+Frame
+        # Main scrollable container (Canvas + Frame)
         self.canvas = tk.Canvas(self, borderwidth=0, background="#fff")
         self.scroll_frame = ttk.Frame(self.canvas)
         self.v_scroll = ttk.Scrollbar(self, orient="vertical", command=self.canvas.yview)
@@ -22,7 +22,7 @@ class PlanView(ttk.Frame):
         self.window_id = self.canvas.create_window((0,0), window=self.scroll_frame, anchor="n")
         self.scroll_frame.bind("<Configure>", self._on_frame_configure)
         self.canvas.bind("<Configure>", self._on_canvas_configure)
-        # 只在鼠标悬停时绑定滚轮事件
+        # Only bind mouse-wheel events while hovering
         self.canvas.bind("<Enter>", self._bind_mousewheel)
         self.canvas.bind("<Leave>", self._unbind_mousewheel)
         self._init_ui(self.scroll_frame)
@@ -38,7 +38,7 @@ class PlanView(ttk.Frame):
         self.canvas.configure(scrollregion=self.canvas.bbox("all"))
 
     def _on_canvas_configure(self, event):
-        # 居中 scroll_frame
+        # Center the scroll_frame inside the canvas
         canvas_width = event.width
         frame_width = self.scroll_frame.winfo_reqwidth()
         x = max((canvas_width - frame_width) // 2, 0)
@@ -47,7 +47,7 @@ class PlanView(ttk.Frame):
     def _on_mousewheel(self, event):
         delta = event.delta
         if abs(delta) < 10:
-            delta *= 120  # macOS 兼容
+            delta *= 120  # macOS compatibility
         self.canvas.yview_scroll(int(-1*(delta/120)), "units")
 
     def _on_shift_mousewheel(self, event):
@@ -59,7 +59,7 @@ class PlanView(ttk.Frame):
     def _init_ui(self, parent):
         self.title_label = tb.Label(parent, text=self._get_text('plan_title'), font=self.main_window.questrial_bold, foreground="#333")
         self.title_label.pack(padx=8, pady=(0, 8), anchor="center")
-        # 表格区
+        # Table area
         table_frame = ttk.Frame(parent)
         table_frame.pack(fill="x", padx=8, pady=4)
         self.table = ttk.Treeview(table_frame, columns=("category", "amount", "percent"), show="headings", height=6)
@@ -72,10 +72,10 @@ class PlanView(ttk.Frame):
         self.table.pack(side="left", fill="both", expand=True)
         self.table.bind("<MouseWheel>", self._on_table_mousewheel)
         self.table.bind("<Shift-MouseWheel>", self._on_table_shift_mousewheel)
-        # 提示区
+        # Notes area
         self.notes_label = tb.Label(parent, text="", font=self.main_window.questrial_label, foreground="#C33")
         self.notes_label.pack(padx=8, pady=(4, 8), anchor="center")
-        # 图表区（预留）
+        # Chart placeholder (reserved)
         self.chart_placeholder = tb.Label(parent, text="(Chart Area)", font=self.main_window.questrial_label, foreground="#888")
         self.chart_placeholder.pack(padx=8, pady=(4, 8), anchor="center")
 

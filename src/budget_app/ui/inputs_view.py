@@ -4,7 +4,14 @@ from ttkbootstrap.constants import *
 from tkinter import ttk
 import tkinter.font as tkfont
 from PIL import Image, ImageDraw, ImageTk, ImageFont
-import cairosvg
+
+# cairosvg can require native cairo libs; import lazily where needed
+try:
+    import cairosvg
+    _CAIROSVG_AVAILABLE = True
+except Exception:
+    cairosvg = None
+    _CAIROSVG_AVAILABLE = False
 
 LANGUAGES = {
     'en': {
@@ -56,7 +63,7 @@ class InputsView(tb.Frame):
         style = tb.Style()
         style.configure("Custom.TFrame", background="#F0F0F0")
 
-        # 滚动区（双向滚动条）
+    # Scrollable area (vertical and horizontal scrollbars)
         self.canvas = tb.Canvas(self, bg="#F0F0F0", highlightthickness=0)
         self.scroll_frame = tb.Frame(self.canvas, style="Custom.TFrame")
         self.v_scroll = ttk.Scrollbar(self, orient="vertical", command=self.canvas.yview)
@@ -68,14 +75,14 @@ class InputsView(tb.Frame):
         self.window_id = self.canvas.create_window((0,0), window=self.scroll_frame, anchor="nw")
         self.scroll_frame.bind("<Configure>", self._on_frame_configure)
         self.canvas.bind("<Configure>", self._on_canvas_configure)
-        # 只在鼠标悬停时绑定滚轮事件
+    # Only bind mouse-wheel events while the cursor is over the canvas
         self.canvas.bind("<Enter>", self._bind_mousewheel)
         self.canvas.bind("<Leave>", self._unbind_mousewheel)
 
-        # 错误提示区
+    # Error message area
         self.error_label = tb.Label(self.scroll_frame, text="", bootstyle=DANGER)
         self.error_label.pack(pady=2, anchor="center")
-        # 收入输入区
+    # Income input area
         self.income_frame = tb.LabelFrame(self.scroll_frame, text=LANGUAGES[self.lang]['income_input'], bootstyle=INFO)
         self.income_frame.pack(pady=10, anchor="center")
         self.income_entries = []
@@ -83,14 +90,14 @@ class InputsView(tb.Frame):
         self.add_income_btn = tb.Button(self.income_frame, text=LANGUAGES[self.lang]['add_income'], command=lambda: self.add_income_entry(self.income_frame), bootstyle=SECONDARY)
         self.add_income_btn.pack(side="right", padx=10, pady=5)
 
-        # 固定支出区
+    # Fixed expense area
         self.fixed_frame = tb.LabelFrame(self.scroll_frame, text=LANGUAGES[self.lang]['fixed_costs'], bootstyle=WARNING)
         self.fixed_frame.pack(pady=10, anchor="center")
         self.fixed_entries = []
         for label in LANGUAGES[self.lang]['fixed_labels']:
             self.add_fixed_entry(self.fixed_frame, label)
 
-        # 预算偏好区
+    # Budget preferences area
         self.prefs_frame = tb.LabelFrame(self.scroll_frame, text=LANGUAGES[self.lang]['budget_prefs'], bootstyle=SUCCESS)
         self.prefs_frame.pack(pady=10, anchor="center")
         self.pref_entries = []
@@ -99,7 +106,7 @@ class InputsView(tb.Frame):
         self.percent_total_label = tb.Label(self.prefs_frame, text=LANGUAGES[self.lang]['plan_total'].format(percent=0), bootstyle=INFO)
         self.percent_total_label.pack(side="right", padx=10)
 
-        # 约束区
+    # Constraints area
         self.constraint_frame = tb.LabelFrame(self.scroll_frame, text=LANGUAGES[self.lang]['constraint_settings'], bootstyle=DANGER)
         self.constraint_frame.pack(pady=10, anchor="center")
         self.constraint_entries = []
@@ -108,7 +115,7 @@ class InputsView(tb.Frame):
         self.add_constraint_btn = tb.Button(self.constraint_frame, text=LANGUAGES[self.lang]['add_constraint'], command=lambda: self.add_constraint_entry(self.constraint_frame, LANGUAGES[self.lang]['constraint_labels'][0]), bootstyle=SECONDARY)
         self.add_constraint_btn.pack(side="right", padx=10, pady=5)
 
-        # 提交与重置
+    # Submit and reset controls
         btn_frame = tb.Frame(self.scroll_frame)
         btn_frame.pack(pady=15, anchor="center")
         self.submit_btn = tb.Button(btn_frame, text=LANGUAGES[self.lang]['submit'], bootstyle=PRIMARY, command=self.submit)
@@ -127,7 +134,7 @@ class InputsView(tb.Frame):
         self.canvas.configure(scrollregion=self.canvas.bbox("all"))
 
     def _on_canvas_configure(self, event):
-        # 居中 scroll_frame
+        # Center the scroll_frame inside the canvas
         canvas_width = event.width
         frame_width = self.scroll_frame.winfo_reqwidth()
         x = max((canvas_width - frame_width) // 2, 0)
@@ -136,7 +143,7 @@ class InputsView(tb.Frame):
     def _on_mousewheel(self, event):
         delta = event.delta
         if abs(delta) < 10:
-            delta *= 120  # macOS 兼容
+            delta *= 120  # macOS compatibility
         self.canvas.yview_scroll(int(-1*(delta/120)), "units")
         return "break"
 
@@ -149,7 +156,7 @@ class InputsView(tb.Frame):
 
     def set_language(self, lang):
         self.lang = lang
-        # 更新所有区块标题和按钮文本
+        # Update all section titles and button texts
         self.income_frame.config(text=LANGUAGES[lang]['income_input'])
         self.add_income_btn.config(text=LANGUAGES[lang]['add_income'])
         self.fixed_frame.config(text=LANGUAGES[lang]['fixed_costs'])
@@ -162,8 +169,8 @@ class InputsView(tb.Frame):
         self.error_label.config(text="")
         # 更新各项label
         for i, (label, amt_entry) in enumerate(self.fixed_entries):
-            # fixed_entries 存储的是 (label, amt_entry)，label 是字符串，amt_entry 是 Entry
-            # 需要找到对应的 Label 控件
+            # fixed_entries stores tuples (label, amt_entry): label is a string, amt_entry is the Entry widget
+            # find the corresponding Label widget and update its text
             frame = amt_entry.master
             lbl = frame.winfo_children()[0]
             lbl.config(text=LANGUAGES[lang]['fixed_labels'][i])
@@ -251,7 +258,7 @@ class InputsView(tb.Frame):
         max_spin.pack(side="left", padx=5)
         del_btn = tb.Button(frame, text=LANGUAGES[self.lang]['delete'], bootstyle=DANGER, command=lambda: self._del_constraint_entry(frame))
         del_btn.pack(side="left", padx=5)
-        # 悬停提示
+        # Hover hints
         def show_min_hint(event):
             hint = "Minimum budget" if self.lang == "en" else "最小预算"
             self.controller.button_hint_label.config(text=hint)
@@ -274,50 +281,56 @@ class InputsView(tb.Frame):
                 break
 
     def submit(self):
-        # 收集所有输入数据，校验并传递给 planner
-        data = {
-            "income": [],
-            "fixed": {},
-            "prefs": {},
-            "constraints": {}
-        }
+        # Collect all inputs, validate and pass to planner
+        # Build a PlanningInput from UI values and call the main window's planner
+        try:
+            from src.budget_app.core.defaults import starter_input
+            from src.budget_app.core.models import Income, FixedExpense
+            from src.budget_app.utils.money import Money
+        except Exception:
+            # fallback to package imports if running as module
+            from ..core.defaults import starter_input
+            from ..core.models import Income, FixedExpense
+            from ..utils.money import Money
+
+        # Start from starter input and overwrite incomes/fixed with user values
+        plan_input = starter_input()
+
+        # collect incomes
+        incomes = []
         for _, src, period, amt in self.income_entries:
             name = src.get().strip()
-            per = period.get()
             try:
                 amount = float(amt.get())
             except ValueError:
-                amount = 0
+                amount = 0.0
             if name and amount > 0:
-                data["income"].append({"name": name, "period": per, "amount": amount})
+                incomes.append(Income(name=name, amount=Money(str(amount))))
+        if incomes:
+            plan_input.incomes = incomes
+
+        # collect fixed expenses
+        fixed = []
         for label, amt in self.fixed_entries:
             try:
                 amount = float(amt.get())
             except ValueError:
-                amount = 0
-            data["fixed"][label] = amount
-        for label, spin in self.pref_entries:
-            try:
-                percent = int(spin.get())
-            except ValueError:
-                percent = 0
-            data["prefs"][label] = percent
-        for _, label, min_spin, max_spin in self.constraint_entries:
-            try:
-                minv = int(min_spin.get())
-                maxv = int(max_spin.get())
-            except ValueError:
-                minv, maxv = 0, 100
-            data["constraints"][label] = {"min": minv, "max": maxv}
-        # 校验
+                amount = 0.0
+            fixed.append(FixedExpense(name=label, amount=Money(str(amount)), essential=True))
+        if fixed:
+            plan_input.fixed = fixed
+
+        # simple validation: percent total must be 100
         self.update_percent_total()
         if self.error_label.cget("text") != "":
             return
-        # TODO: 传递 data 给 planner
-        print("提交数据:", data)
+
+        # Pass the PlanningInput object to the main window to generate plan
+        if hasattr(self.controller, 'generate_plan'):
+            self.controller.generate_plan(plan_input)
 
     def reset(self):
-        # 清空所有输入
+        # Clear all inputs
         for _, src, period, amt in self.income_entries:
             src.delete(0, "end")
             period.set(LANGUAGES[self.lang]['period_month'])
