@@ -17,7 +17,6 @@ A modern cross-platform personal budget planner built with Python, Tkinter, and 
 - matplotlib
 - pillow
 - cairosvg
-- reportlab (optional, for PDF export)
 
 ## Installation
 1. Clone the repository:
